@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TAP_PUSH_TOKEN }}
 
       - name: Get release info
         id: release
@@ -45,6 +47,10 @@ jobs:
             homepage "https://github.com/teilomillet/mime"
 
             app "Mime.app"
+
+            postflight do
+              system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Mime.app"]
+            end
           end
           RUBY
           # Fix indentation
