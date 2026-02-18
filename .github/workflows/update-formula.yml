@@ -1,0 +1,59 @@
+name: Update Formula
+
+on:
+  repository_dispatch:
+    types: [update-formula]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get release info
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.client_payload.tag }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Wait for the release asset to be available
+          for i in $(seq 1 30); do
+            URL="https://github.com/teilomillet/mime/releases/download/${TAG}/Mime_${VERSION}_aarch64.dmg"
+            STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$STATUS" = "200" ]; then
+              SHA=$(curl -sL "$URL" | shasum -a 256 | cut -d ' ' -f 1)
+              echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Update cask
+        run: |
+          cat > Casks/mime.rb << 'RUBY'
+          cask "mime" do
+            version "${{ steps.release.outputs.version }}"
+            sha256 "${{ steps.release.outputs.sha256 }}"
+
+            url "https://github.com/teilomillet/mime/releases/download/v#{version}/Mime_#{version}_aarch64.dmg"
+            name "Mime"
+            desc "A distraction-free note-taking app"
+            homepage "https://github.com/teilomillet/mime"
+
+            app "Mime.app"
+          end
+          RUBY
+          # Fix indentation
+          sed -i 's/^          //' Casks/mime.rb
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/mime.rb
+          git commit -m "Update mime to ${{ steps.release.outputs.version }}"
+          git push
