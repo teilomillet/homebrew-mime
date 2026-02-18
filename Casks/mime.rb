@@ -8,4 +8,8 @@ cask "mime" do
   homepage "https://github.com/teilomillet/mime"
 
   app "Mime.app"
+
+  postflight do
+    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Mime.app"]
+  end
 end
